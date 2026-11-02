@@ -2,7 +2,7 @@
 
 website: https://iam566-numericaloptimisation.github.io
 
-Lecture notes for IAM 566, Fall 2026. The site is a condensed reading of the course PDFs, with the original mathematics kept and a figure only where the geometry is the point. The PDFs stay in [lecture-notes_AI-Generated](https://github.com/IAM566-NumericalOptimisation/lecture-notes_AI-Generated). This repository is the website.
+Lecture notes for IAM 566, Fall 2026. The site is a condensed reading of the course PDFs where stay in [lecture-notes_AI-Generated](https://github.com/IAM566-NumericalOptimisation/lecture-notes_AI-Generated). This repository is the website.
 
 ## Adding a chapter
 
