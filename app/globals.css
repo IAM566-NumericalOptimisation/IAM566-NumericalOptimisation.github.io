@@ -1,0 +1,113 @@
+:root {
+  --bg: #f6f4ef;
+  --ink: #1c1b18;
+  --muted: #5e5a52;
+  --faint: #8a857c;
+  --accent: #1d4e48;
+  --line: rgba(28, 27, 24, 0.14);
+  --line-strong: rgba(28, 27, 24, 0.32);
+  --page: min(72rem, calc(100% - 3rem));
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-theme="dark"] {
+  --bg: #141311;
+  --ink: #ece8df;
+  --muted: #b0aba0;
+  --faint: #7d786e;
+  --accent: #8fbfb6;
+  --line: rgba(236, 232, 223, 0.14);
+  --line-strong: rgba(236, 232, 223, 0.34);
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; color-scheme: light; }
+
+[data-theme="dark"] { color-scheme: dark; }
+
+body {
+  --serif: var(--font-newsreader), "Newsreader", "Iowan Old Style", Palatino, serif;
+  --mono: var(--font-ibm-plex-mono), "IBM Plex Mono", ui-monospace, monospace;
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 1.125rem;
+  line-height: 1.65;
+  text-rendering: optimizeLegibility;
+  transition: background-color 0.25s var(--ease), color 0.25s var(--ease);
+}
+
+a {
+  color: var(--accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+
+button, input { font: inherit; color: inherit; }
+
+::selection { background: rgba(29, 78, 72, 0.16); }
+
+[data-theme="dark"] ::selection { background: rgba(143, 191, 182, 0.28); }
+
+[data-theme="dark"] .katex { color: var(--ink); }
+
+.skip {
+  position: absolute;
+  left: 1rem;
+  top: -4rem;
+  background: var(--ink);
+  color: var(--bg);
+  padding: 0.35rem 0.6rem;
+}
+
+.skip:focus { top: 0.6rem; }
+
+.shell {
+  width: var(--page);
+  margin: 0 auto;
+  padding-bottom: 5rem;
+}
+
+.prose { max-width: 44rem; }
+
+.prose > * + * { margin-top: 0.95em; }
+
+.prose h2 {
+  margin: 2.6rem 0 0.7rem;
+  padding-top: 1.35rem;
+  border-top: 1px solid var(--line);
+  font-size: 1.65rem;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.prose h2:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.prose p { margin: 0.75rem 0; }
+
+.prose strong:first-child {
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin-right: 0.4rem;
+}
+
+.prose .katex-display {
+  margin: 1.1rem 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.prose a { color: var(--accent); }
+.prose a:hover { color: var(--ink); }
