@@ -1,0 +1,73 @@
+/* The 3-D figures: a host for the WebGL canvas and its LaTeX labels, and a two-pane layout. */
+
+.host {
+  position: relative;
+  height: 440px;
+  cursor: grab;
+}
+
+.host:active {
+  cursor: grabbing;
+}
+
+.label {
+  font-size: 0.95rem;
+  line-height: 1;
+  white-space: nowrap;
+  text-shadow: 0 0 3px var(--surface), 0 0 6px var(--surface);
+  pointer-events: none;
+}
+
+.label :global(.katex) {
+  font-size: 1em;
+}
+
+.panes {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.pane {
+  position: relative;
+  min-width: 0;
+}
+
+.pane + .pane {
+  border-left: 1px solid var(--line);
+}
+
+.paneLabel {
+  position: absolute;
+  right: 0.9rem;
+  top: 0.7rem;
+  z-index: 1;
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--faint);
+  pointer-events: none;
+}
+
+.fallback {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  margin: 0;
+  padding: 1rem;
+  font-family: var(--serif);
+  color: var(--muted);
+  text-align: center;
+}
+
+@container (max-width: 720px) {
+  .panes {
+    grid-template-columns: 1fr;
+  }
+  .pane + .pane {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+  .host {
+    height: 360px;
+  }
+}

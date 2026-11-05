@@ -1,21 +1,67 @@
+.nav p {
+  margin: 0 0 0.8rem;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.track {
+  position: relative;
+  padding-left: 0.9rem;
+  border-left: 1px solid var(--line);
+}
+
 .nav ol {
   list-style: none;
-  margin: 0.8rem 0 0;
+  margin: 0;
   padding: 0;
 }
 
+/* the filled part of the line: everything read so far */
+.progress {
+  position: absolute;
+  left: -1px;
+  top: 0;
+  width: 2px;
+  background: var(--accent);
+  transition: height 0.4s var(--ease);
+}
+
 .nav a {
+  position: relative;
   display: grid;
-  grid-template-columns: 1.6rem minmax(0, 1fr);
-  gap: 0.45rem;
-  padding: 0.28rem 0;
+  grid-template-columns: 1.5rem minmax(0, 1fr);
+  gap: 0.3rem;
+  padding: 0.32rem 0;
   text-decoration: none;
   color: var(--faint);
-  font-family: var(--mono);
-  font-size: 0.72rem;
+  font-size: 0.84rem;
   line-height: 1.35;
-  letter-spacing: 0.01em;
+  transition: color 0.2s var(--ease);
 }
+
+.nav a span {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  padding-top: 0.12rem;
+}
+
+.nav a[data-read="true"] { color: var(--muted); }
 
 .nav a:hover,
 .nav a[aria-current="true"] { color: var(--ink); }
+
+.nav a[aria-current="true"] { font-weight: 500; }
+
+.nav a[aria-current="true"]::before {
+  content: "";
+  position: absolute;
+  left: calc(-0.9rem - 4px);
+  top: 0.72rem;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}

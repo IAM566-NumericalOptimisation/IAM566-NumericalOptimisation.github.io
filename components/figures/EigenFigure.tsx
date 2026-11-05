@@ -1,165 +1,164 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { watchTheme } from "@/components/theme";
-import { Tex } from "./Tex";
-import { COPPER, GREEN, INK, BLUE, arrow, axes, bindDrag, dot, mountPlane, near, rule, text } from "./plane";
-import type { View } from "./plane";
-import { pretty } from "./scene";
-import styles from "./figures.module.css";
+import { LaTeX, Line, Text, Vector, useMovablePoint } from "mafs";
+import { useState } from "react";
+import { Action, C, Plane, Readout, Slider, Stage, Tex, fmt, useTween } from "@/components/kit";
 
-type Pair = [number, number];
+type V = [number, number];
 
-const E1: Pair = [5, 2];
-const E2: Pair = [1, 1];
+// the notes' A = [[4,-5],[2,-3]]: lambda = 2 along (5,2), lambda = -1 along (1,1)
+const E1: V = [5, 2];
+const E2: V = [1, 1];
+const L1 = 2;
+const L2 = -1;
+const KMAX = 6;
+const snap = ([x, y]: V): V => [Math.round(x * 4) / 4, Math.round(y * 4) / 4];
 
-function coords(x: number, y: number) {
-  const c1 = (x - y) / 3;
-  const c2 = (5 * y - 2 * x) / 3;
-  return [c1, c2] as const;
+/** Coordinates of x in the eigenbasis: x = c1 (5,2) + c2 (1,1). */
+export const coords = ([x, y]: V): V => [(x - y) / 3, (5 * y - 2 * x) / 3];
+
+/**
+ * The factor a component on the eigenline of lambda carries after "k" steps, for real k:
+ * whole steps multiply by lambda, and a partial step moves along (1-s) + s lambda,
+ * the path (1-s)I + sA takes on that line. At whole k it is lambda^k.
+ */
+export const factor = (lambda: number, k: number) => {
+  const whole = Math.floor(k);
+  const s = k - whole;
+  return lambda ** whole * (1 - s + s * lambda);
+};
+
+/** A^k x, by the split along the eigenlines. */
+export function power(x: V, k: number) {
+  const [c1, c2] = coords(x);
+  const s1 = c1 * factor(L1, k);
+  const s2 = c2 * factor(L2, k);
+  const p1: V = [s1 * E1[0], s1 * E1[1]];
+  const tip: V = [p1[0] + s2 * E2[0], p1[1] + s2 * E2[1]];
+  return { c1, c2, s1, s2, p1, tip };
 }
 
+/** A rational with a small denominator in LaTeX, as the notes write 1/3 and 2/3; decimals otherwise. */
+export function frac(n: number) {
+  for (const d of [1, 2, 3, 4, 6, 12]) {
+    const p = Math.round(n * d);
+    if (Math.abs(n * d - p) < 1e-9) {
+      if (d === 1) return String(p);
+      const g = gcd(Math.abs(p), d);
+      const [pp, dd] = [p / g, d / g];
+      return dd === 1 ? String(pp) : `${pp < 0 ? "-" : ""}\\tfrac{${Math.abs(pp)}}{${dd}}`;
+    }
+  }
+  return fmt(n, 3);
+}
+const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
+
 export function EigenFigure() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const viewRef = useRef<View | null>(null);
-  const [x, setX] = useState<Pair>([1, 0]);
+  const x = useMovablePoint([1, 0], { color: C.blue, constrain: (p) => snap(p as V) });
   const [k, setK] = useState(0);
-  const [playing, setPlaying] = useState(false);
-  const stateRef = useRef({ x, k });
-  stateRef.current = { x, k };
-  const drawRef = useRef(() => {});
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const draw = () => drawRef.current();
-    const observer = new ResizeObserver(draw);
-    observer.observe(canvas);
-    const unbind = bindDrag(
-      canvas,
-      (px, py) => {
-        const view = viewRef.current;
-        const { x: p, k: step } = stateRef.current;
-        if (!view) return null;
-        if (step === 0) {
-          const [c1, c2] = coords(p[0], p[1]);
-          const sum: Pair = [c1 * E1[0] + c2 * E2[0], c1 * E1[1] + c2 * E2[1]];
-          if (near(view, sum[0], sum[1], px, py, 18)) return "x";
-        } else if (near(view, p[0], p[1], px, py, 18)) return "x";
-        return null;
-      },
-      (_id, px, py) => {
-        const view = viewRef.current;
-        if (!view) return;
-        setPlaying(false);
-        setX([view.wx(px), view.wy(py)]);
-      },
-    );
-    const stopTheme = watchTheme(draw);
-    return () => {
-      stopTheme();
-      observer.disconnect();
-      unbind();
-    };
-  }, []);
-
-  useEffect(() => {
-    drawRef.current = () => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const { x: p, k: step } = stateRef.current;
-      const [c1, c2] = coords(p[0], p[1]);
-      const s1 = c1 * 2 ** step;
-      const s2 = c2 * (-1) ** step;
-      const comp1: Pair = [s1 * E1[0], s1 * E1[1]];
-      const comp2: Pair = [s2 * E2[0], s2 * E2[1]];
-      const sum: Pair = [comp1[0] + comp2[0], comp1[1] + comp2[1]];
-      const norm = Math.hypot(sum[0], sum[1]);
-      const display = norm > 2.15 ? 2.15 / norm : 1;
-      const view = mountPlane(canvas, 0, 0, 2.75);
-      viewRef.current = view;
-      if (!view) return;
-      axes(view);
-      rule(view, 0, 0, E1[0], E1[1], GREEN, 1.15);
-      rule(view, 0, 0, E2[0], E2[1], COPPER, 1.15);
-      const a: Pair = [comp1[0] * display, comp1[1] * display];
-      const b: Pair = [a[0] + comp2[0] * display, a[1] + comp2[1] * display];
-      arrow(view, 0, 0, a[0], a[1], GREEN, 2);
-      arrow(view, a[0], a[1], b[0], b[1], COPPER, 2);
-      arrow(view, 0, 0, b[0], b[1], INK, 1.5);
-      if (step > 0) {
-        arrow(view, 0, 0, p[0], p[1], BLUE, 1.4);
-        dot(view, p[0], p[1], BLUE, 4);
-        text(view, p[0], p[1], "x", BLUE);
-      }
-      dot(view, b[0], b[1], INK, 4);
-      text(view, b[0], b[1], step === 0 ? "x" : "A^k x");
-      text(view, 1.45, 0.62, "λ = 2", GREEN);
-      text(view, 1.05, 1.15, "λ = −1", COPPER);
-    };
-    drawRef.current();
-  }, [x, k]);
-
-  useEffect(() => {
-    if (!playing) return;
-    const id = window.setInterval(() => {
-      setK((current) => (current >= 8 ? 0 : current + 1));
-    }, 700);
-    return () => window.clearInterval(id);
-  }, [playing]);
-
-  const [c1, c2] = coords(x[0], x[1]);
-  const s1 = c1 * 2 ** k;
-  const s2 = c2 * (-1) ** k;
-  const image: Pair = [s1 * 5 + s2, s1 * 2 + s2];
-  const signed = (coeff: number, body: string) => {
-    if (Math.abs(coeff) < 5e-4) return "";
-    const piece = `${pretty(Math.abs(coeff))}${body}`;
-    return coeff < 0 ? `-${piece}` : `+${piece}`;
+  // the drawn power moves continuously between whole steps
+  const kt = useTween(0, 900);
+  const go = (target: number) => {
+    setK(target);
+    kt.to(target, 800 * Math.max(1, Math.abs(target - kt.value)));
   };
-  const expression = `${signed(s1, "(5,2)")}${signed(s2, "(1,1)")}`.replace(/^\+/, "") || "0";
-  const formula = `k=${k},\\quad [x]_B=(${pretty(c1)},${pretty(c2)}),\\quad A^{k}x=${expression}=(${pretty(image[0])},${pretty(image[1])})`;
+
+  const shown = power(x.point, kt.value);
+  // zoom out so that every arrow stays in view: the window is [-6.5z, 6.5z] x [-4z, 4z]
+  const need = [x.point, shown.p1, shown.tip].map(([a, b]) => Math.max(Math.abs(a) / 6, Math.abs(b) / 3.6));
+  const z = Math.max(1, ...need);
+  // grid spacing doubles as the window grows
+  const g = 2 ** Math.max(0, Math.ceil(Math.log2(z)));
+  const nx = Math.ceil((6.5 * z) / g);
+  const ny = Math.ceil((4 * z) / g);
+
+  // the readout is at the whole step the figure is going to
+  const at = power(x.point, k);
+  const [c1, c2] = [at.c1, at.c2];
+  const piece = (coeff: number, body: string, first: boolean) => {
+    if (Math.abs(coeff) < 1e-12) return "";
+    const f = frac(Math.abs(coeff));
+    const num = f === "1" ? "" : f;
+    return `${coeff < 0 ? "-" : first ? "" : "+"}${num}\\,${body}`;
+  };
+  const split = `${piece(at.s1, "(5,2)", true)}${piece(at.s2, "(1,1)", Math.abs(at.s1) < 1e-12)}` || "0";
+  const len = Math.hypot(...at.tip);
+  const angle = len < 1e-12 ? NaN : (Math.acos(Math.max(-1, Math.min(1, (at.tip[0] * 5 + at.tip[1] * 2) / (len * Math.hypot(5, 2))))) * 180) / Math.PI;
+  const whole = Math.abs(kt.value - Math.round(kt.value)) < 1e-6;
 
   return (
-    <figure className={styles.figure}>
-      <canvas ref={canvasRef} className={`${styles.canvas} ${styles.plane}`} aria-label="Powers of the course matrix, split along its two eigenlines. Drag x." />
-      <div className={styles.controls}>
-        <label>
-          k
-          <input
-            type="range"
-            min={0}
-            max={8}
-            step={1}
-            value={k}
-            aria-label="Power k"
-            onChange={(event) => {
-              setPlaying(false);
-              setK(Number(event.target.value));
+    <Stage
+      hint="drag x"
+      controls={
+        <>
+          <Slider tex="k" value={k} min={0} max={KMAX} step={1} onChange={go} />
+          <Action primary onClick={() => go(k >= KMAX ? 0 : k + 1)}>
+            {k >= KMAX ? (
+              <>
+                Back to <Tex tex="k=0" />
+              </>
+            ) : (
+              <>
+                Apply <Tex tex="A" />
+              </>
+            )}
+          </Action>
+          <Action
+            onClick={() => {
+              x.setPoint([1, 0]);
+              go(0);
             }}
-          />
-        </label>
-        <button type="button" className={styles.text} aria-pressed={playing} onClick={() => setPlaying((on) => !on)}>
-          {playing ? "Stop" : "Apply A"}
-        </button>
-        <button
-          type="button"
-          className={styles.text}
-          onClick={() => {
-            setPlaying(false);
-            setX([1, 0]);
-            setK(0);
-          }}
-        >
-          Notes
-        </button>
-      </div>
-      <div className={styles.formula}>
-        <Tex source={formula} display />
-      </div>
-      <figcaption className={styles.caption}>
-        Drag <Tex source="x" />. Green is the eigenvalue <Tex source="2" />, copper is <Tex source="-1" />. Each step multiplies those components by <Tex source="2" /> and by <Tex source="-1" />, so the copper piece flips and then shrinks beside the green one. From the notes&apos; <Tex source="(1,0)=\tfrac13(5,2)-\tfrac23(1,1)" />, the direction turns toward <Tex source="(5,2)" />. Once <Tex source="A^k x" /> leaves the window the arrow keeps that direction and the formula keeps the length.
-      </figcaption>
-    </figure>
+          >
+            The notes&apos; <Tex tex="x=(1,0)" />
+          </Action>
+        </>
+      }
+      readout={
+        <Readout
+          tex={`x = ${piece(c1, "(5,2)", true)}${piece(c2, "(1,1)", Math.abs(c1) < 1e-12)}${Math.abs(c1) < 1e-12 && Math.abs(c2) < 1e-12 ? "0" : ""},\\qquad A^{${k}}x = ${split} = (${frac(at.tip[0])},\\ ${frac(at.tip[1])})`}
+          items={[
+            { label: "teal coefficient", tex: `c_1\\,2^{${k}} = ${frac(at.s1)}`, tone: "teal" },
+            { label: "copper coefficient", tex: `c_2\\,(-1)^{${k}} = ${frac(at.s2)}`, tone: "copper" },
+            { label: "angle to (5,2)", tex: Number.isFinite(angle) ? `${fmt(angle, 2)}^\\circ` : "\\text{undefined}" },
+            { label: "window", tex: z > 1.001 ? `\\text{zoomed out } ${fmt(z, 1)}\\times` : "\\text{actual size}" },
+          ]}
+        />
+      }
+      caption={
+        <>
+          Teal is the component on the eigenline of <Tex tex="\lambda=2" />, copper the one on <Tex tex="\lambda=-1" />, laid head to tail to reach <Tex tex="A^k x" />. Each application of{" "}
+          <Tex tex="A" /> doubles the teal piece and reverses the copper one, which passes through zero on the way. The notes&apos; <Tex tex="(1,0)=\tfrac13(5,2)-\tfrac23(1,1)" /> has
+          coefficients <Tex tex="2^k/3" /> and <Tex tex="-\tfrac23(-1)^k" /> after <Tex tex="k" /> steps; the first dominates, so the direction turns toward <Tex tex="(5,2)" />. The window
+          zooms out as the vector grows, and the grid spacing doubles with it.
+        </>
+      }
+    >
+      <Plane x={[-6.5 * z, 6.5 * z]} y={[-4 * z, 4 * z]} height={440} grid={false}>
+        {Array.from({ length: 2 * nx + 1 }, (_, i) => i - nx).map((i) => (
+          <Line.Segment key={`v${i}`} point1={[i * g, -ny * g]} point2={[i * g, ny * g]} color={C.muted} opacity={i === 0 ? 0.45 : 0.12} weight={1} />
+        ))}
+        {Array.from({ length: 2 * ny + 1 }, (_, i) => i - ny).map((i) => (
+          <Line.Segment key={`h${i}`} point1={[-nx * g, i * g]} point2={[nx * g, i * g]} color={C.muted} opacity={i === 0 ? 0.45 : 0.12} weight={1} />
+        ))}
+        {Array.from({ length: 2 * nx + 1 }, (_, i) => i - nx)
+          .filter((i) => i !== 0 && i % 2 === 0)
+          .map((i) => (
+            <Text key={`t${i}`} x={i * g} y={0} attach="s" size={11} color={C.faint}>
+              {String(i * g)}
+            </Text>
+          ))}
+        <Line.ThroughPoints point1={[0, 0]} point2={E1} color={C.teal} style="dashed" opacity={0.6} />
+        <Line.ThroughPoints point1={[0, 0]} point2={E2} color={C.copper} style="dashed" opacity={0.6} />
+        <LaTeX at={[5.3 * z, 1.45 * z]} tex="\lambda=2" color={C.teal} />
+        <LaTeX at={[-2.2 * z, -3.3 * z]} tex="\lambda=-1" color={C.copper} />
+        {kt.value > 0 ? <Vector tip={x.point} color={C.blue} weight={2} opacity={0.7} /> : null}
+        <Vector tip={shown.p1} color={C.teal} weight={5} opacity={0.7} />
+        <Vector tail={shown.p1} tip={shown.tip} color={C.copper} weight={5} opacity={0.7} />
+        <Vector tip={shown.tip} color={C.ink} weight={2.5} />
+        {kt.value > 0.05 ? <LaTeX at={[shown.tip[0] + 0.5 * z, shown.tip[1] + 0.45 * z]} tex={whole ? `A^{${Math.round(kt.value)}}x` : "A^k x"} color={C.ink} /> : null}
+        <LaTeX at={[x.x + 0.35 * z, x.y - 0.4 * z]} tex="x" color={C.blue} />
+        {x.element}
+      </Plane>
+    </Stage>
   );
 }

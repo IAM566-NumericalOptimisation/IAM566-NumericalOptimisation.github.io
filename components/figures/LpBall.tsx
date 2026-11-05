@@ -1,238 +1,257 @@
 "use client";
 
+import { LaTeX, Line, Point, Polygon, Text } from "mafs";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { watchTheme } from "@/components/theme";
-import { Tex } from "./Tex";
-import { tone } from "./plane";
-import { GREEN, INK, createStage, makeArrow, recolor, setArrow, setThemeColor, fmt } from "./scene";
-import styles from "./figures.module.css";
+import { Action, C, Plane, Readout, Segmented, Slider, Stage, Tex, fmt, useTween } from "@/components/kit";
+import { tryCreateSpace, v3 } from "./space";
+import styles from "./space.module.css";
 
-const SAMPLE = new THREE.Vector3(0.7, 0.45, 0.35);
+type V = [number, number];
 
-function lpNorm(x: number, y: number, z: number, p: number) {
-  if (!Number.isFinite(p)) return Math.max(Math.abs(x), Math.abs(y), Math.abs(z));
-  return (Math.abs(x) ** p + Math.abs(y) ** p + Math.abs(z) ** p) ** (1 / p);
+/** The Lp "norm" for any p > 0, and the max norm at p = Infinity. For p < 1 it is not a norm. */
+export function lp(x: readonly number[], p: number) {
+  if (!Number.isFinite(p)) return Math.max(...x.map(Math.abs));
+  return x.reduce((s, v) => s + Math.abs(v) ** p, 0) ** (1 / p);
+}
+
+/** Radius of the slice x3 = c of the unit ball: { |x1|^p + |x2|^p <= 1 - |c|^p } is the Lp disc of that radius. */
+export const sliceRadius = (p: number, c: number) => (Number.isFinite(p) ? Math.max(0, 1 - Math.abs(c) ** p) ** (1 / p) : Math.abs(c) <= 1 ? 1 : 0);
+
+/** Points of the Lp circle of radius r in the plane, by scaling each direction to norm r. */
+export function circle(p: number, r: number, n = 480): V[] {
+  return Array.from({ length: n }, (_, i) => {
+    const a = (2 * Math.PI * i) / n;
+    const d: V = [Math.cos(a), Math.sin(a)];
+    const s = r / lp(d, p);
+    return [d[0] * s, d[1] * s];
+  });
+}
+
+// p runs on a log scale, p = 0.5 * 20^s for s in [0, 1], so 1/2, 1 and 2 are evenly spread
+const P0 = 0.5;
+const toS = (p: number) => Math.log(p / P0) / Math.log(20);
+const toP = (s: number) => Math.round(P0 * 20 ** s * 1000) / 1000;
+
+// the surface is a subdivided cube pushed out radially: its face centres are the axes (the
+// octahedron's corners) and its face edges are the cube's edges, so p = 1 and p = infinity stay sharp
+const N = 48;
+const FACES: [THREE.Vector3, THREE.Vector3, THREE.Vector3][] = [
+  [v3(1, 0, 0), v3(0, 1, 0), v3(0, 0, 1)],
+  [v3(-1, 0, 0), v3(0, 0, 1), v3(0, 1, 0)],
+  [v3(0, 1, 0), v3(0, 0, 1), v3(1, 0, 0)],
+  [v3(0, -1, 0), v3(1, 0, 0), v3(0, 0, 1)],
+  [v3(0, 0, 1), v3(1, 0, 0), v3(0, 1, 0)],
+  [v3(0, 0, -1), v3(0, 1, 0), v3(1, 0, 0)],
+];
+
+function ballGeometry() {
+  const dirs: number[] = [];
+  const index: number[] = [];
+  FACES.forEach(([n, a, b], f) => {
+    for (let i = 0; i <= N; i++) {
+      for (let j = 0; j <= N; j++) {
+        const d = n.clone().addScaledVector(a, (2 * i) / N - 1).addScaledVector(b, (2 * j) / N - 1).normalize();
+        dirs.push(d.x, d.y, d.z);
+      }
+    }
+    const base = f * (N + 1) * (N + 1);
+    for (let i = 0; i < N; i++) {
+      for (let j = 0; j < N; j++) {
+        const k = base + i * (N + 1) + j;
+        index.push(k, k + N + 1, k + 1, k + 1, k + N + 1, k + N + 2);
+      }
+    }
+  });
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(dirs.length), 3));
+  geometry.setIndex(index);
+  return { geometry, dirs: Float32Array.from(dirs) };
 }
 
 export function LpBall() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const sliceRef = useRef<HTMLCanvasElement>(null);
-  const updateRef = useRef<(p: number) => void>(() => {});
-  const [p, setP] = useState(2);
+  const hostRef = useRef<HTMLDivElement>(null);
+  const draw = useRef<((p: number, c: number) => void) | null>(null);
+  const [failed, setFailed] = useState(false);
   const [infinite, setInfinite] = useState(false);
-  const [playing, setPlaying] = useState(false);
-  const value = infinite ? Infinity : p;
+  const [c, setC] = useState(0);
+  const s = useTween(toS(2), 900);
+  const pendingInf = useRef(false);
+  const p = infinite ? Infinity : toP(s.value);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const { scene, renderer, controls, resize } = createStage(canvas, new THREE.Vector3(3.5, 2.6, 3.7));
-    const segU = 80;
-    const segV = 48;
-    const positions = new Float32Array((segU + 1) * (segV + 1) * 3);
-    const geom = new THREE.BufferGeometry();
-    geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    const index: number[] = [];
-    for (let i = 0; i < segV; i++) {
-      for (let j = 0; j < segU; j++) {
-        const a = i * (segU + 1) + j;
-        index.push(a, a + segU + 1, a + 1, a + 1, a + segU + 1, a + segU + 2);
-      }
-    }
-    geom.setIndex(index);
-    const material = new THREE.MeshStandardMaterial({
-      color: GREEN,
-      roughness: 0.48,
-      metalness: 0.02,
-      transparent: true,
-      opacity: 0.86,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    });
-    setThemeColor(material, GREEN);
-    scene.add(new THREE.Mesh(geom, material));
-    const sample = makeArrow(INK);
-    scene.add(sample);
-    setArrow(sample, SAMPLE);
+    const host = hostRef.current;
+    if (!host) return;
+    const space = tryCreateSpace(host, { position: v3(4.4, -3.8, 2.9), axis: 1.7, labelClass: styles.label });
+    if (!space) return setFailed(true);
+    const { geometry, dirs } = ballGeometry();
+    const positions = geometry.getAttribute("position") as THREE.BufferAttribute;
+    const material = space.paint(
+      new THREE.MeshStandardMaterial({ transparent: true, opacity: 0.62, side: THREE.DoubleSide, depthWrite: false, roughness: 0.55, metalness: 0 }),
+      "teal",
+    );
+    const ball = new THREE.Mesh(geometry, material);
+    space.scene.add(ball);
+    const sheet = space.paint(new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.08, side: THREE.DoubleSide, depthWrite: false }), "ink");
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 2.6), sheet);
+    space.scene.add(plane);
+    const rim = space.line("ink", 2.5);
+    const sliceLabel = space.label("x_3=0", "muted");
 
-    updateRef.current = (next) => {
-      let t = 0;
-      for (let i = 0; i <= segV; i++) {
-        const phi = (Math.PI * i) / segV;
-        for (let j = 0; j <= segU; j++) {
-          const theta = (2 * Math.PI * j) / segU;
-          const x = Math.sin(phi) * Math.cos(theta);
-          const y = Math.sin(phi) * Math.sin(theta);
-          const z = Math.cos(phi);
-          const n = lpNorm(x, y, z, next);
-          const s = n === 0 ? 0 : 1 / n;
-          positions[t++] = x * s;
-          positions[t++] = y * s;
-          positions[t++] = z * s;
-        }
+    draw.current = (pp, cc) => {
+      for (let i = 0; i < dirs.length; i += 3) {
+        const r = 1 / lp([dirs[i], dirs[i + 1], dirs[i + 2]], pp);
+        positions.setXYZ(i / 3, dirs[i] * r, dirs[i + 1] * r, dirs[i + 2] * r);
       }
-      geom.attributes.position.needsUpdate = true;
-      geom.computeVertexNormals();
-      setThemeColor(material, next < 1 ? 0x8a3e2a : GREEN);
+      positions.needsUpdate = true;
+      geometry.computeVertexNormals();
+      geometry.computeBoundingSphere();
+      space.paint(material, pp < 1 ? "copper" : "teal");
+      plane.position.set(0, 0, cc);
+      const pts = circle(pp, sliceRadius(pp, cc), 240).map(([x, y]) => v3(x, y, cc));
+      rim.setPoints([...pts, pts[0]]);
+      sliceLabel.position.set(-1.25, -1.25, cc);
+      sliceLabel.setTex(`x_3=${fmt(cc, 2)}`);
     };
-    updateRef.current(2);
-
-    const observer = new ResizeObserver(resize);
-    observer.observe(canvas);
-    resize();
-    let frame = 0;
-    const loop = () => {
-      frame = requestAnimationFrame(loop);
-      controls.update();
-      renderer.render(scene, controls.object as THREE.PerspectiveCamera);
-    };
-    loop();
-    const stopTheme = watchTheme(() => recolor(scene));
     return () => {
-      stopTheme();
-      cancelAnimationFrame(frame);
-      observer.disconnect();
-      controls.dispose();
-      geom.dispose();
-      material.dispose();
-      renderer.dispose();
+      draw.current = null;
+      space.dispose();
     };
   }, []);
 
-  useEffect(() => {
-    updateRef.current(value);
-    drawSlice(sliceRef.current, value);
-    return watchTheme(() => {
-      updateRef.current(value);
-      drawSlice(sliceRef.current, value);
-    });
-  }, [value]);
+  useEffect(() => draw.current?.(p, c), [p, c]);
 
+  // the sweep and the infinity preset run s up to 1 (p = 10) and then switch to p = infinity
   useEffect(() => {
-    if (!playing) return;
-    const started = performance.now();
-    let frame = 0;
-    const tick = (now: number) => {
-      const u = ((now - started) % 9000) / 9000;
-      const sweep = u < 0.82 ? 1 + (u / 0.82) * 15 : Infinity;
-      if (sweep === Infinity) {
-        setInfinite(true);
-      } else {
-        setInfinite(false);
-        setP(Math.round(sweep * 20) / 20);
-      }
-      frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [playing]);
+    if (pendingInf.current && s.value >= 1) {
+      pendingInf.current = false;
+      setInfinite(true);
+    }
+  }, [s.value]);
 
-  const length = lpNorm(SAMPLE.x, SAMPLE.y, SAMPLE.z, value);
-  const sum = 2 ** (1 / (Number.isFinite(value) ? value : 80));
-  const pTex = infinite ? "\\infty" : fmt(value);
-  const formula = [
-    `\\|x\\|_p=\\left(\\sum_i |x_i|^p\\right)^{1/p},\\quad p=${pTex}`,
-    `\\qquad \\|v\\|_p=${fmt(length)}`,
-    length <= 1 ? "\\le 1" : "> 1",
-    value < 1
-      ? `\\qquad \\|e_1\\|_p+\\|e_2\\|_p=2 < \\|e_1+e_2\\|_p=${fmt(sum)}`
-      : "",
-  ].join(" ");
+  const toward = (target: number | "inf", ms?: number) => {
+    setInfinite(false);
+    pendingInf.current = target === "inf";
+    s.to(target === "inf" ? 1 : toS(target), ms);
+  };
+
+  const rho = sliceRadius(p, c);
+  const curve = circle(p, rho);
+  const pTex = Number.isFinite(p) ? fmt(p, 2) : "\\infty";
+  const notes = lp([3, -4], p);
+  const pair = lp([1, 1], p);
+  const convex = p >= 1;
+  const mid: V = [rho / 2, rho / 2];
+  const preset = infinite ? "inf" : [0.5, 1, 2].includes(p) ? String(p) : "";
 
   return (
-    <figure className={styles.figure}>
-      <div className={styles.views}>
-        <div>
-          <p className={styles.viewLabel}>
-            <Tex source="\mathbb{R}^3" />
-          </p>
-          <canvas ref={canvasRef} className={styles.canvas} aria-label="Unit sphere of the Lp norm in three dimensions" />
-        </div>
-        <div>
-          <p className={styles.viewLabel}>
-            <Tex source="x_3=0" />
-          </p>
-          <canvas ref={sliceRef} className={styles.slice} aria-label="Planar slice of the Lp unit circle" />
-        </div>
-      </div>
-      <div className={styles.controls}>
-        <label>
-          p
-          <input
-            type="range"
-            min={0.5}
-            max={12}
-            step={0.1}
-            value={infinite ? 12 : p}
-            aria-label="Exponent p"
-            onChange={(event) => {
-              setPlaying(false);
+    <Stage
+      hint="drag to turn the ball"
+      controls={
+        <>
+          <Segmented
+            label="Exponent p"
+            value={preset}
+            onChange={(v) => toward(v === "inf" ? "inf" : Number(v))}
+            options={[
+              { value: "0.5", tex: "p=\\tfrac12" },
+              { value: "1", tex: "p=1" },
+              { value: "2", tex: "p=2" },
+              { value: "inf", tex: "p=\\infty" },
+            ]}
+          />
+          <Slider
+            tex="p"
+            value={s.value}
+            min={0}
+            max={1}
+            step={0.005}
+            show={pTex}
+            onChange={(v) => {
+              pendingInf.current = false;
               setInfinite(false);
-              setP(Number(event.target.value));
+              s.set(v);
             }}
           />
-        </label>
-        <button
-          type="button"
-          className={styles.text}
-          aria-pressed={infinite}
-          onClick={() => {
-            setPlaying(false);
-            setInfinite((on) => !on);
-          }}
-        >
-          p = ∞
-        </button>
-        <button type="button" className={styles.text} aria-pressed={playing} onClick={() => setPlaying((on) => !on)}>
-          {playing ? "Stop" : "Play"}
-        </button>
+          <Slider tex="x_3" value={c} min={-0.9} max={0.9} step={0.05} onChange={setC} />
+          <Action
+            primary
+            onClick={() => {
+              s.set(0);
+              toward("inf", 9000);
+            }}
+          >
+            Sweep <Tex tex="p" /> from <Tex tex="\tfrac12" /> to <Tex tex="\infty" />
+          </Action>
+        </>
+      }
+      readout={
+        <Readout
+          tex={
+            Number.isFinite(p)
+              ? `\\|x\\|_{${pTex}} = \\Big(\\sum_{i=1}^{3} |x_i|^{${pTex}}\\Big)^{1/${pTex}},\\qquad \\|(3,-4)\\|_{${pTex}} = ${fmt(notes, 3)}`
+              : `\\|x\\|_\\infty = \\max_i |x_i|,\\qquad \\|(3,-4)\\|_\\infty = ${fmt(notes, 3)}`
+          }
+          items={[
+            {
+              label: "triangle inequality",
+              tex: `\\|e_1+e_2\\|_{${pTex}} = ${fmt(pair, 3)} ${pair <= 2 + 1e-12 ? "\\le" : ">"} 2 = \\|e_1\\|_{${pTex}}+\\|e_2\\|_{${pTex}}`,
+              tone: pair > 2 + 1e-12 ? "copper" : "teal",
+            },
+            { label: "unit ball", tex: convex ? "\\text{convex}" : "\\text{not convex}", tone: convex ? "teal" : "copper" },
+            {
+              label: "slice",
+              tex: Number.isFinite(p) ? `|x_1|^{${pTex}}+|x_2|^{${pTex}} \\le 1-|x_3|^{${pTex}} = ${fmt(rho ** p, 3)}` : `\\max(|x_1|,|x_2|) \\le 1`,
+            },
+          ]}
+        />
+      }
+      caption={
+        <>
+          The surface is the unit sphere <Tex tex="\|x\|_p=1" /> in <Tex tex="\mathbb{R}^3" />, and the right pane is its slice at the chosen height, with the slices for{" "}
+          <Tex tex="p=1" /> and <Tex tex="p=\infty" /> dashed for comparison. As <Tex tex="p" /> grows the ball grows from the octahedron through the round ball to the cube. Below{" "}
+          <Tex tex="p=1" /> the surface bends inward: at <Tex tex="p=\tfrac12" /> the midpoint of the chord from <Tex tex="e_1" /> to <Tex tex="e_2" /> lies outside, and{" "}
+          <Tex tex="\|e_1+e_2\|_{1/2}=4>2" />, so the triangle inequality fails. The notes&apos; <Tex tex="(3,-4)" /> has norms <Tex tex="7" />, <Tex tex="5" /> and <Tex tex="4" /> at{" "}
+          <Tex tex="p=1,2,\infty" />.
+        </>
+      }
+    >
+      <div className={styles.panes}>
+        <div className={`${styles.pane} ${styles.host}`} ref={hostRef} role="img" aria-label="The unit sphere of the Lp norm in three dimensions, with a horizontal slicing plane">
+          {failed ? <p className={styles.fallback}>This view needs WebGL, which is not available here.</p> : null}
+        </div>
+        <div className={styles.pane}>
+          <p className={styles.paneLabel}>
+            <Tex tex={`x_3=${fmt(c, 2)}`} />
+          </p>
+          <Plane x={[-1.4, 1.4]} y={[-1.4, 1.4]} height={440}>
+            <Polygon points={circle(1, sliceRadius(1, c), 8)} color={C.muted} fillOpacity={0} weight={1} strokeStyle="dashed" />
+            <Polygon points={circle(Infinity, sliceRadius(Infinity, c), 8)} color={C.muted} fillOpacity={0} weight={1} strokeStyle="dashed" />
+            <Polygon points={curve} color={convex ? C.teal : C.copper} fillOpacity={0.16} weight={2.5} />
+            {rho > 0.05 ? (
+              <>
+                <Line.Segment point1={[rho, 0]} point2={[0, rho]} color={C.violet} style="dashed" weight={1.5} />
+                <Point x={rho} y={0} color={C.ink} />
+                <Point x={0} y={rho} color={C.ink} />
+                <Point x={mid[0]} y={mid[1]} color={lp(mid, p) > rho + 1e-12 ? C.copper : C.teal} />
+              </>
+            ) : null}
+            {c === 0 ? (
+              <>
+                <LaTeX at={[1.12, -0.14]} tex="e_1" color={C.ink} />
+                <LaTeX at={[-0.16, 1.12]} tex="e_2" color={C.ink} />
+                <LaTeX at={[mid[0] + 0.32, mid[1] + 0.16]} tex="\tfrac12(e_1+e_2)" color={C.violet} />
+              </>
+            ) : null}
+            <Text x={1} y={0} attach="s" size={11} color={C.faint}>
+              1
+            </Text>
+            <Text x={0} y={-1} attach="w" size={11} color={C.faint}>
+              −1
+            </Text>
+          </Plane>
+        </div>
       </div>
-      <div className={styles.formula}>
-        <Tex source={formula} display />
-      </div>
-      <figcaption className={styles.caption}>
-        The surface is <Tex source="\|x\|_p=1" />. As <Tex source="p" /> grows it passes from the octahedron through the sphere to the cube. For <Tex source="p<1" /> the straight segment between <Tex source="e_1" /> and <Tex source="e_2" /> leaves the set, so the triangle inequality fails.
-      </figcaption>
-    </figure>
+    </Stage>
   );
-}
-
-function drawSlice(canvas: HTMLCanvasElement | null, p: number) {
-  if (!canvas) return;
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const w = canvas.clientWidth || 280;
-  const h = canvas.clientHeight || 320;
-  canvas.width = Math.floor(w * dpr);
-  canvas.height = Math.floor(h * dpr);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, w, h);
-  const cx = w / 2;
-  const cy = h / 2;
-  const scale = Math.min(w, h) * 0.36;
-  ctx.strokeStyle = tone("rgba(28,27,24,0.25)");
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(16, cy);
-  ctx.lineTo(w - 12, cy);
-  ctx.moveTo(cx, 14);
-  ctx.lineTo(cx, h - 16);
-  ctx.stroke();
-  ctx.strokeStyle = tone(p < 1 ? "#8a3e2a" : "#1d4e48");
-  ctx.lineWidth = 1.6;
-  ctx.beginPath();
-  for (let i = 0; i <= 360; i++) {
-    const theta = (i * Math.PI) / 180;
-    const x = Math.cos(theta);
-    const y = Math.sin(theta);
-    const n = Number.isFinite(p) ? (Math.abs(x) ** p + Math.abs(y) ** p) ** (1 / p) : Math.max(Math.abs(x), Math.abs(y));
-    const px = cx + (x / n) * scale;
-    const py = cy - (y / n) * scale;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  ctx.closePath();
-  ctx.stroke();
 }

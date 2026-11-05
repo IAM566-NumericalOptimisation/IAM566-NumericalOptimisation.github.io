@@ -1,147 +1,160 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { watchTheme } from "@/components/theme";
-import { Tex } from "./Tex";
-import { COPPER, GREEN, INK, arrow, axes, bindDrag, dot, mountPlane, near, rightAngle, rule, text } from "./plane";
-import type { View } from "./plane";
-import { fmt, pretty } from "./scene";
-import styles from "./figures.module.css";
+import { LaTeX, Line, Point, Polygon, Vector, useMovablePoint } from "mafs";
+import { useState } from "react";
+import { Action, C, Plane, Readout, Slider, Stage, Tex, fmt, useTween, vecTex } from "@/components/kit";
 
-type Pair = [number, number];
+type V = [number, number];
 
-const NOTES = { v1: [1, 0] as Pair, v2: [1, 1] as Pair, x: [5, 2] as Pair };
+const snap = ([x, y]: V): V => [Math.round(x * 4) / 4, Math.round(y * 4) / 4];
+const det = (u: V, v: V) => u[0] * v[1] - u[1] * v[0];
+const isZero = (v: V) => v[0] === 0 && v[1] === 0;
+const EPS = 1e-9;
 
-function solve(v1: Pair, v2: Pair, x: Pair) {
-  const det = v1[0] * v2[1] - v1[1] * v2[0];
-  const scale = Math.hypot(v1[0], v1[1]) * Math.hypot(v2[0], v2[1]);
-  const independent = Math.abs(det) > Math.max(1e-3, 0.02 * scale);
-  if (!independent) {
-    const axis = Math.hypot(v1[0], v1[1]) >= Math.hypot(v2[0], v2[1]) ? v1 : v2;
-    const n2 = axis[0] * axis[0] + axis[1] * axis[1];
-    const coeff = n2 < 1e-8 ? 0 : (x[0] * axis[0] + x[1] * axis[1]) / n2;
-    const proj: Pair = [coeff * axis[0], coeff * axis[1]];
-    return { independent, det, alpha: 0, beta: 0, proj, dist: Math.hypot(x[0] - proj[0], x[1] - proj[1]) };
+/**
+ * Weights c, not all zero, with Σ cᵢ vᵢ = 0; null when the vectors are
+ * independent. Handles two or three vectors in the plane.
+ */
+export function relation(vs: V[]): number[] | null {
+  const [v1, v2, v3] = vs;
+  const D = det(v1, v2);
+  if (Math.abs(D) > EPS) {
+    if (!v3) return null;
+    // v₃ = c₁v₁ + c₂v₂ by Cramer's rule, so c₁v₁ + c₂v₂ − v₃ = 0
+    return [det(v3, v2) / D, det(v1, v3) / D, -1];
   }
-  const alpha = (x[0] * v2[1] - x[1] * v2[0]) / det;
-  const beta = (v1[0] * x[1] - v1[1] * x[0]) / det;
-  return { independent, det, alpha, beta, proj: [0, 0] as Pair, dist: 0 };
+  const pad = vs.length === 3 ? [0] : [];
+  if (isZero(v1)) return [1, 0, ...pad];
+  // v₂ is a multiple λv₁ of the nonzero v₁, so λv₁ − v₂ = 0
+  const lambda = Math.abs(v1[0]) > Math.abs(v1[1]) ? v2[0] / v1[0] : v2[1] / v1[1];
+  return [lambda, -1, ...pad];
 }
 
+/** Σ cᵢ vᵢ in LaTeX, with zero weights dropped and unit weights written bare. */
+export function comboTex(c: number[], names: string[]) {
+  let out = "";
+  c.forEach((ci, i) => {
+    if (Math.abs(ci) < EPS) return;
+    const mag = Math.abs(Math.abs(ci) - 1) < EPS ? "" : fmt(Math.abs(ci), 2);
+    out += ci < 0 ? ` - ${mag}${names[i]}` : `${out ? " + " : ""}${mag}${names[i]}`;
+  });
+  return (out.startsWith(" - ") ? "-" + out.slice(3) : out) || "0";
+}
+
+/** Dimension of the span of vectors in the plane: 2, 1 or 0. */
+export function rank(vs: V[]) {
+  for (let i = 0; i < vs.length; i++) for (let j = i + 1; j < vs.length; j++) if (Math.abs(det(vs[i], vs[j])) > EPS) return 2;
+  return vs.some((v) => !isZero(v)) ? 1 : 0;
+}
+
+const TARGET: V = [5, 2];
+
 export function SpanFigure() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const viewRef = useRef<View | null>(null);
-  const [v1, setV1] = useState<Pair>(NOTES.v1);
-  const [v2, setV2] = useState<Pair>(NOTES.v2);
-  const [x, setX] = useState<Pair>(NOTES.x);
-  const stateRef = useRef({ v1, v2, x });
-  stateRef.current = { v1, v2, x };
-  const drawRef = useRef(() => {});
+  const v1 = useMovablePoint([1, 0], { color: C.teal, constrain: snap });
+  const v2 = useMovablePoint([1, 1], { color: C.copper, constrain: snap });
+  const v3 = useMovablePoint([2, 1], { color: C.violet, constrain: snap });
+  const [third, setThird] = useState(false);
+  const al = useTween(3, 1200);
+  const be = useTween(2, 1200);
+  const alpha = al.value;
+  const beta = be.value;
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const draw = () => drawRef.current();
-    draw();
-    const observer = new ResizeObserver(draw);
-    observer.observe(canvas);
-    const unbind = bindDrag(
-      canvas,
-      (px, py) => {
-        const view = viewRef.current;
-        const { v1: a, v2: b, x: p } = stateRef.current;
-        if (!view) return null;
-        if (near(view, p[0], p[1], px, py)) return "x";
-        if (near(view, b[0], b[1], px, py)) return "v2";
-        if (near(view, a[0], a[1], px, py)) return "v1";
-        return null;
-      },
-      (id, px, py) => {
-        const view = viewRef.current;
-        if (!view) return;
-        const next: Pair = [view.wx(px), view.wy(py)];
-        if (id === "v1") setV1(next);
-        else if (id === "v2") setV2(next);
-        else setX(next);
-      },
-    );
-    const stopTheme = watchTheme(draw);
-    return () => {
-      stopTheme();
-      observer.disconnect();
-      unbind();
-    };
-  }, []);
+  const a: V = [alpha * v1.x, alpha * v1.y];
+  const w: V = [a[0] + beta * v2.x, a[1] + beta * v2.y];
+  const shown = third ? [v1.point, v2.point, v3.point] : [v1.point, v2.point];
+  const names = third ? ["v_1", "v_2", "v_3"] : ["v_1", "v_2"];
+  const dim = rank(shown);
+  const rel = relation(shown);
+  const D = det(v1.point, v2.point);
+  const along = shown.find((v) => !isZero(v));
 
-  useEffect(() => {
-    drawRef.current = () => {
-      const { v1: a, v2: b, x: p } = stateRef.current;
-      const solved = solve(a, b, p);
-      const pts: Pair[] = [a, b, p];
-      if (solved.independent) {
-        pts.push([solved.alpha * a[0], solved.alpha * a[1]], [solved.beta * b[0], solved.beta * b[1]]);
-      }
-      let span = 3.4;
-      for (const point of pts) span = Math.max(span, Math.abs(point[0]) / 0.7, Math.abs(point[1]) / 0.7);
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const view = mountPlane(canvas, 0, 0, Math.min(span, 16));
-      viewRef.current = view;
-      if (!view) return;
-      axes(view);
-      if (!solved.independent) {
-        const axis = Math.hypot(a[0], a[1]) >= Math.hypot(b[0], b[1]) ? a : b;
-        if (Math.hypot(axis[0], axis[1]) > 1e-6) rule(view, 0, 0, axis[0], axis[1], GREEN, 1.15);
-        arrow(view, 0, 0, solved.proj[0], solved.proj[1], GREEN, 1.7);
-        arrow(view, solved.proj[0], solved.proj[1], p[0], p[1], COPPER, 1.7);
-        if (solved.dist > 0.15 && Math.hypot(solved.proj[0], solved.proj[1]) > 0.15) {
-          rightAngle(view, solved.proj[0], solved.proj[1], p[0] - solved.proj[0], p[1] - solved.proj[1], axis[0], axis[1]);
-        }
-      } else {
-        const side: Pair = [solved.alpha * a[0], solved.alpha * a[1]];
-        const tip: Pair = [side[0] + solved.beta * b[0], side[1] + solved.beta * b[1]];
-        arrow(view, 0, 0, side[0], side[1], GREEN, 1.5);
-        arrow(view, side[0], side[1], tip[0], tip[1], COPPER, 1.5);
-      }
-      arrow(view, 0, 0, a[0], a[1], GREEN, 2.3);
-      arrow(view, 0, 0, b[0], b[1], COPPER, 2.3);
-      arrow(view, 0, 0, p[0], p[1], INK, 1.6);
-      dot(view, a[0], a[1], GREEN, 3.5);
-      dot(view, b[0], b[1], COPPER, 3.5);
-      dot(view, p[0], p[1], INK, 3.5);
-      text(view, a[0], a[1], "v1", GREEN);
-      text(view, b[0], b[1], "v2", COPPER);
-      text(view, p[0], p[1], "x");
-    };
-    drawRef.current();
-  }, [v1, v2, x]);
-
-  const solved = solve(v1, v2, x);
-  const formula = solved.independent
-    ? `x = ${pretty(solved.alpha)}\\, v_1 + ${pretty(solved.beta)}\\, v_2,\\qquad \\det(v_1,v_2)=${fmt(solved.det)}`
-    : `v_1 \\parallel v_2,\\qquad \\operatorname{dist}(x,\\operatorname{span})= ${fmt(solved.dist)}`;
+  const solve = () => {
+    // the weights of (5,2) in v₁, v₂: α = x₁ − x₂, β = x₂ for the notes' pair
+    al.to(det(TARGET, v2.point) / D);
+    be.to(det(v1.point, TARGET) / D);
+  };
 
   return (
-    <figure className={styles.figure}>
-      <canvas ref={canvasRef} className={`${styles.canvas} ${styles.plane}`} aria-label="Span of two vectors in the plane. Drag the tips." />
-      <div className={styles.inline}>
-        <button type="button" className={styles.text} onClick={() => { setV1(NOTES.v1); setV2(NOTES.v2); setX(NOTES.x); }}>
-          Notes
-        </button>
-        <button
-          type="button"
-          className={styles.text}
-          onClick={() => setV2([2 * v1[0], 2 * v1[1]])}
-        >
-          Parallel
-        </button>
-      </div>
-      <div className={styles.formula}>
-        <Tex source={formula} display />
-      </div>
-      <figcaption className={styles.caption}>
-        Drag the tips. The green and copper sides are the two weights, and they meet at <Tex source="x" /> exactly when the pair is a basis. The notes&apos; vectors give <Tex source="(5,2)=3v_1+2v_2" />. Set them parallel and <Tex source="x" /> falls off the line: a dependent pair spans less, which is why <Tex source="v_3=v_1+v_2" /> adds nothing.
-      </figcaption>
-    </figure>
+    <Stage
+      hint={third ? "drag v₁, v₂ and v₃" : "drag v₁ and v₂"}
+      controls={
+        <>
+          <Slider tex="\alpha" value={alpha} min={-4} max={4} step={0.25} onChange={al.set} show={fmt(alpha, 2)} />
+          <Slider tex="\beta" value={beta} min={-4} max={4} step={0.25} onChange={be.set} show={fmt(beta, 2)} />
+          {Math.abs(D) > EPS ? (
+            <Action primary onClick={solve}>
+              Reach <Tex tex="(5,2)" />
+            </Action>
+          ) : null}
+          <Action pressed={third} onClick={() => setThird(!third)}>
+            Add <Tex tex="v_3" />
+          </Action>
+          <Action
+            onClick={() => {
+              v1.setPoint([1, 0]);
+              v2.setPoint([1, 1]);
+              v3.setPoint([2, 1]);
+              al.set(3);
+              be.set(2);
+            }}
+          >
+            The notes&apos; vectors
+          </Action>
+        </>
+      }
+      readout={
+        <Readout
+          tex={`${fmt(alpha, 2)}\\,${vecTex(v1.point)} + ${fmt(beta, 2)}\\,${vecTex(v2.point)} = ${vecTex(w)}`}
+          items={[
+            { label: "det [v₁ v₂]", tex: fmt(D, 2), tone: Math.abs(D) > EPS ? "teal" : "copper" },
+            { label: "dimension of the span", tex: dim === 2 ? "2,\\ \\mathbb{R}^2" : dim === 1 ? "1,\\ \\text{a line}" : "0,\\ \\{0\\}" },
+            rel
+              ? { label: "dependent", tex: `${comboTex(rel, names)} = 0`, tone: "copper" }
+              : { label: "independent", tex: `${names.map((_, i) => `c_${i + 1}`).join(" = ")} = 0\\ \\text{only}`, tone: "teal" },
+          ]}
+        />
+      }
+      caption={
+        <>
+          The blue arrow is <Tex tex="\alpha v_1 + \beta v_2" />, built tip to tail; the shading is every place it can reach. With the notes&apos;{" "}
+          <Tex tex="v_1 = (1,0)^\mathsf{T}" /> and <Tex tex="v_2 = (1,1)^\mathsf{T}" /> that is the whole plane, and{" "}
+          <Tex tex="(5,2)^\mathsf{T} = 3v_1 + 2v_2" />. Line the two up and the span collapses to a line, and the readout names a combination
+          with weights not all zero that gives <Tex tex="0" />. Adding <Tex tex="v_3 = (2,1)^\mathsf{T}" /> adds nothing:{" "}
+          <Tex tex="v_1 + v_2 - v_3 = 0" />, so the span is unchanged.
+        </>
+      }
+    >
+      <Plane x={[-3, 8]} y={[-3, 5]} height={440}>
+        {dim === 2 ? (
+          <Polygon points={[[-20, -20], [20, -20], [20, 20], [-20, 20]]} color={C.teal} fillOpacity={0.07} weight={0} />
+        ) : dim === 1 && along ? (
+          <Line.ThroughPoints point1={[0, 0]} point2={along} color={C.teal} weight={7} opacity={0.25} />
+        ) : (
+          <Point x={0} y={0} color={C.teal} />
+        )}
+        <Point x={TARGET[0]} y={TARGET[1]} color={C.muted} opacity={0.6} />
+        <LaTeX at={[TARGET[0] + 0.45, TARGET[1] - 0.4]} tex="(5,2)" color={C.muted} />
+
+        {/* tip to tail: αv₁, then βv₂ from its tip */}
+        <Vector tip={a} color={C.teal} weight={4} opacity={0.45} />
+        <Vector tail={a} tip={w} color={C.copper} weight={4} opacity={0.45} />
+        <Vector tip={w} color={C.blue} weight={2.5} />
+        <LaTeX at={[w[0] + 0.3, w[1] + 0.4]} tex="\alpha v_1 + \beta v_2" color={C.blue} />
+
+        <Vector tip={v1.point} color={C.teal} weight={3} />
+        <Vector tip={v2.point} color={C.copper} weight={3} />
+        <LaTeX at={[v1.x + 0.3, v1.y - 0.4]} tex="v_1" color={C.teal} />
+        <LaTeX at={[v2.x - 0.4, v2.y + 0.35]} tex="v_2" color={C.copper} />
+        {third ? (
+          <>
+            <Vector tip={v3.point} color={C.violet} weight={3} />
+            <LaTeX at={[v3.x + 0.35, v3.y + 0.35]} tex="v_3" color={C.violet} />
+          </>
+        ) : null}
+        {v1.element}
+        {v2.element}
+        {third ? v3.element : null}
+      </Plane>
+    </Stage>
   );
 }

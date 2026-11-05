@@ -1,56 +1,144 @@
-.main { padding-top: 3.4rem; }
+.hero {
+  max-width: 48rem;
+  padding: 6rem 0 2.5rem;
+}
 
-.title {
+.kicker {
   margin: 0;
-  font-size: clamp(2.4rem, 5vw, 3.6rem);
-  font-weight: 500;
-  letter-spacing: -0.035em;
-  line-height: 1.02;
-}
-
-.lede {
-  margin: 1rem 0 0;
-  max-width: 38rem;
-  color: var(--muted);
-}
-
-.list {
-  list-style: none;
-  margin: 2.4rem 0 0;
-  padding: 0;
-  max-width: 40rem;
-  border-top: 1px solid var(--line);
-}
-
-.row {
-  display: grid;
-  grid-template-columns: 3.4rem minmax(0, 1fr) auto;
-  gap: 0.8rem 1.2rem;
-  align-items: baseline;
-  padding: 0.9rem 0;
-  border-bottom: 1px solid var(--line);
-  text-decoration: none;
-  color: inherit;
-}
-
-.code {
   font-family: var(--mono);
-  font-size: 0.78rem;
-  color: var(--faint);
-}
-
-.name {
-  font-size: 1.35rem;
-  letter-spacing: -0.02em;
-  transition: color 0.2s var(--ease);
-}
-
-.soon {
-  font-family: var(--mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--faint);
 }
 
-.row:hover .name { color: var(--accent); }
+.title {
+  margin: 1.1rem 0 0;
+  font-size: clamp(3rem, 8vw, 5.6rem);
+  font-weight: 600;
+  letter-spacing: -0.055em;
+  line-height: 0.95;
+}
+
+.lede {
+  margin: 1.4rem 0 0;
+  font-family: var(--serif);
+  font-size: 1.3rem;
+  color: var(--muted);
+}
+
+.cta {
+  margin: 2rem 0 0;
+}
+
+.cta a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line-strong);
+  padding-bottom: 0.2rem;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.cta a:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.cta a span {
+  transition: transform 0.2s var(--ease);
+}
+
+.cta a:hover span {
+  transform: translateX(4px);
+}
+
+/* the animation: a wide band that fades out at its edges */
+
+.band {
+  margin: 1rem 0 0;
+}
+
+.field {
+  display: block;
+  width: 100%;
+  height: clamp(260px, 38vw, 440px);
+  -webkit-mask-image: radial-gradient(ellipse 70% 75% at 50% 50%, #000 45%, transparent 100%);
+  mask-image: radial-gradient(ellipse 70% 75% at 50% 50%, #000 45%, transparent 100%);
+}
+
+.band figcaption {
+  margin-top: 0.4rem;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--faint);
+}
+
+/* chapters */
+
+.chapters {
+  max-width: 48rem;
+  padding-top: 4rem;
+}
+
+.chaptersHead {
+  margin: 0 0 0.75rem;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: baseline;
+  padding: 0.95rem 0;
+  border-top: 1px solid var(--line);
+  color: var(--faint);
+  text-decoration: none;
+}
+
+.code {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+
+.name {
+  font-size: 1.3rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  transition: color 0.2s var(--ease), transform 0.25s var(--ease);
+}
+
+.status {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.live {
+  color: var(--ink);
+}
+
+.live .status {
+  color: var(--accent);
+}
+
+.row:hover .name {
+  color: var(--accent);
+  transform: translateX(4px);
+}

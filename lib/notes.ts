@@ -53,3 +53,32 @@ export function headingsOf(markdown: string): Heading[] {
   }
   return headings;
 }
+
+export type Block = { kind: "text"; markdown: string } | { kind: "figure"; name: string };
+export type Section = { id: string; title: string; blocks: Block[]; figures: string[] };
+
+/**
+ * Splits a chapter into its introduction (the text before the first ##) and its
+ * sections. Within a section, a figure marker ([[Name]] on a line of its own)
+ * splits the text, so the figure appears exactly where the note puts it.
+ */
+export function sectionsOf(markdown: string): { intro: string; sections: Section[] } {
+  const slugger = new GithubSlugger();
+  const parts = markdown.split(/^##\s+(.+)$/m);
+  const intro = parts[0].trim();
+  const sections: Section[] = [];
+  for (let i = 1; i < parts.length; i += 2) {
+    const title = parts[i].trim();
+    const pieces = parts[i + 1].split(/^\[\[([A-Za-z]+)\]\]\s*$/m);
+    const blocks: Block[] = [];
+    const figures: string[] = [];
+    pieces.forEach((piece, k) => {
+      if (k % 2 === 1) {
+        blocks.push({ kind: "figure", name: piece });
+        figures.push(piece);
+      } else if (piece.trim()) blocks.push({ kind: "text", markdown: piece.trim() });
+    });
+    sections.push({ id: slugger.slug(title), title, blocks, figures });
+  }
+  return { intro, sections };
+}

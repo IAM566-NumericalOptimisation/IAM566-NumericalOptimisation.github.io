@@ -1,0 +1,20 @@
+/* the vectors on the left, the parabola t ↦ ‖x − ty‖² on the right; stacked when narrow */
+.views {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+}
+
+.side {
+  border-left: 1px solid var(--line);
+}
+
+@container (max-width: 600px) {
+  .views {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .side {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+}

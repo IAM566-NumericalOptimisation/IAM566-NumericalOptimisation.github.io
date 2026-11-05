@@ -34,6 +34,8 @@ $$
 
 satisfies $0 \le f(x) < 1$. The infimum $0$ is attained at $x^\star = 0$. The supremum $1$ is not attained, so there is no maximizer.
 
+[[SupInf]]
+
 A set of points in $\mathbb{R}^n$ has no ceiling: vectors are not ordered. There, bounded means that the set fits in a ball. That requires a length.
 
 ## Vector spaces and subspaces
@@ -86,6 +88,8 @@ The pair $\vec v_1 = (1,0)^\mathsf{T}$, $\vec v_2 = (1,1)^\mathsf{T}$ is a basis
 
 The weights in $\vec x = \sum_i \alpha_i \vec x_i$ are unique precisely because a basis is independent: two expansions of the same vector differ by a combination equal to zero. Those weights are the coordinates $[\vec x]_B$. The vector is the point; the coordinates are its name in that basis. If $A$ has the basis vectors as its columns, the coordinates solve $A[\vec x]_B = \vec x$.
 
+[[Basis]]
+
 **Definition.** The dimension $\dim V$ is the number of vectors in a basis of $V$. Every basis of $V$ has the same number.
 
 In a space of dimension $n$, more than $n$ vectors are dependent, and fewer than $n$ vectors cannot span the space.
@@ -111,6 +115,8 @@ A norm measures one vector. A metric measures the gap between two points, and th
 On $\mathbb{R}^2$, the function that equals $1$ when $\vec x \neq \vec y$ and equals $0$ when they coincide is a metric. It comes from no norm: scaling a vector would have to scale its length, and this distance ignores scaling.
 
 The function $\|\vec x\| = |x_1| + |x_2|$ is a norm. Nonnegativity and absolute homogeneity come from the absolute value, and the triangle inequality comes from $|a+b| \le |a| + |b|$ in each component. This is the $L_1$ norm of the next section.
+
+[[Metric]]
 
 ## Lp norms and unit balls
 
@@ -386,6 +392,8 @@ $$
 $$
 
 The polynomial $p(\lambda) = \det(A - \lambda I)$ is the characteristic polynomial, of degree $n$. The eigenspace $E_\lambda = \mathcal{N}(A - \lambda I)$ contains the eigenvectors of $\lambda$ together with $\vec 0$. It is a subspace, so every nonzero multiple of an eigenvector is an eigenvector. Some roots may be complex. The rotation by $\pi/2$, with rows $(0,-1)$ and $(1,0)$, has $p(\lambda) = \lambda^2 + 1$ and no real eigenvector: it turns every direction.
+
+[[Transform]]
 
 For
 

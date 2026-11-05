@@ -7,15 +7,20 @@ export function SiteHeader() {
   return (
     <header className={styles.header}>
       <div className={styles.inner}>
-        <a className={styles.brand} href={site.repo}>
-          IAM566
-        </a>
-        <div className={styles.tools}>
-          <Link className={styles.notes} href="/">
-            Lecture notes
+        <Link className={styles.brand} href="/">
+          <span className={styles.mark} aria-hidden="true" />
+          IAM 566
+          <span className={styles.course}>Numerical Optimization</span>
+        </Link>
+        <nav className={styles.tools} aria-label="Site">
+          <Link className={styles.link} href="/#chapters">
+            Chapters
           </Link>
+          <a className={styles.link} href={site.repo}>
+            Source
+          </a>
           <ThemeToggle />
-        </div>
+        </nav>
       </div>
     </header>
   );

@@ -67,7 +67,7 @@ A figure is a line on its own:
 [[LpBall]]
 ```
 
-The names that exist now are `Affine`, `Span`, `LpBall`, `Cauchy`, `Projection`, `GramSchmidt`, `Subspaces`, and `Eigen`. They are registered in `components/NoteBody.tsx`. A new figure needs a component there as well as the marker in the note.
+The names that exist now are `SupInf`, `Affine`, `Span`, `Basis`, `Metric`, `LpBall`, `Cauchy`, `Projection`, `GramSchmidt`, `Subspaces`, `Transform`, and `Eigen`. They are registered, with their titles, in `components/figures/registry.tsx`. A new figure needs an entry there as well as the marker in the note. On a wide screen each figure sits beside its section and stays in view while the section is read.
 
 `linear-algebra.md` is the pattern to follow. The other files are still `status: forthcoming`.
 

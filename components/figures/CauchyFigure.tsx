@@ -1,173 +1,178 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { watchTheme } from "@/components/theme";
-import { Tex } from "./Tex";
-import {
-  COPPER,
-  GREEN,
-  INK,
-  arc,
-  arrow,
-  axes,
-  bindDrag,
-  dot,
-  mountGraph,
-  mountPlane,
-  near,
-  path,
-  rule,
-  segment,
-  text,
-  tone,
-} from "./plane";
-import type { View } from "./plane";
-import { fmt } from "./scene";
-import styles from "./figures.module.css";
+import { LaTeX, Line, Plot, Point, Polygon, Vector, useMovablePoint } from "mafs";
+import { Action, C, Plane, Readout, Slider, Stage, Tex, fmt, useTween } from "@/components/kit";
+import styles from "./CauchyFigure.module.css";
 
-type Pair = [number, number];
+type V = [number, number];
 
-function measure(v: Pair, w: Pair) {
-  const ip = v[0] * w[0] + v[1] * w[1];
-  const nv = Math.hypot(v[0], v[1]);
-  const nw = Math.hypot(w[0], w[1]);
-  const cos = nv * nw < 1e-10 ? 0 : ip / (nv * nw);
-  const tStar = nw < 1e-8 ? 0 : ip / (nw * nw);
-  const height = nv * nv - (nw < 1e-8 ? 0 : (ip * ip) / (nw * nw));
-  return { ip, nv, nw, cos, tStar, height: Math.max(0, height) };
+const snap = ([x, y]: V): V => [Math.round(x * 4) / 4, Math.round(y * 4) / 4];
+
+/**
+ * Everything the figure reads off two vectors. The parabola
+ * q(t) = ‖x − ty‖² = ‖x‖² − 2t⟨x,y⟩ + t²‖y‖² has its lowest point at
+ * t* = ⟨x,y⟩/‖y‖², with value ‖x‖² − ⟨x,y⟩²/‖y‖². In the plane that value is
+ * det[x y]²/‖y‖² (Lagrange's identity), which is computed exactly on the grid.
+ */
+export function cauchy(x: number[], y: number[]) {
+  const ip = x.reduce((s, xi, i) => s + xi * y[i], 0);
+  const xx = x.reduce((s, xi) => s + xi * xi, 0);
+  const yy = y.reduce((s, yi) => s + yi * yi, 0);
+  const nx = Math.sqrt(xx);
+  const ny = Math.sqrt(yy);
+  const cos = nx > 0 && ny > 0 ? ip / (nx * ny) : NaN;
+  const tStar = yy > 0 ? ip / yy : 0;
+  const min = yy > 0 ? xx - (ip * ip) / yy : xx;
+  const q = (t: number) => xx - 2 * t * ip + t * t * yy;
+  return { ip, nx, ny, cos, tStar, min, q };
 }
+
+const W = 2; // the parabola is drawn for t within W of its centre
 
 export function CauchyFigure() {
-  const planeRef = useRef<HTMLCanvasElement>(null);
-  const graphRef = useRef<HTMLCanvasElement>(null);
-  const viewRef = useRef<View | null>(null);
-  const [v, setV] = useState<Pair>([1, 2]);
-  const [w, setW] = useState<Pair>([2, 1]);
-  const stateRef = useRef({ v, w });
-  stateRef.current = { v, w };
-  const drawRef = useRef(() => {});
+  const x = useMovablePoint([1, 2], { color: C.blue, constrain: snap });
+  const y = useMovablePoint([2, 1], { color: C.teal, constrain: snap });
+  const tw = useTween(0, 1100);
+  const t = tw.value;
+  const { ip, nx, ny, cos, tStar, q } = cauchy(x.point, y.point);
+  const det = x.x * y.y - x.y * y.x;
+  // the exact minimum on the grid: det² / ‖y‖², or ‖x‖² when y = 0
+  const min = ny > 0 ? (det * det) / (ny * ny) : nx * nx;
+  const parallel = det === 0;
+  const degenerate = nx === 0 || ny === 0;
+  const kind = degenerate ? "\\text{undefined}" : ip > 0 ? "\\text{acute}" : ip < 0 ? "\\text{obtuse}" : "\\text{right}";
 
-  useEffect(() => {
-    const plane = planeRef.current;
-    const graph = graphRef.current;
-    if (!plane || !graph) return;
-    const draw = () => drawRef.current();
-    const observer = new ResizeObserver(draw);
-    observer.observe(plane);
-    observer.observe(graph);
-    const unbind = bindDrag(
-      plane,
-      (px, py) => {
-        const view = viewRef.current;
-        const { v: vv, w: ww } = stateRef.current;
-        if (!view) return null;
-        if (near(view, vv[0], vv[1], px, py)) return "v";
-        if (near(view, ww[0], ww[1], px, py)) return "w";
-        return null;
-      },
-      (id, px, py) => {
-        const view = viewRef.current;
-        if (!view) return;
-        const next: Pair = [view.wx(px), view.wy(py)];
-        if (id === "v") setV(next);
-        else setW(next);
-      },
-    );
-    const stopTheme = watchTheme(draw);
-    return () => {
-      stopTheme();
-      observer.disconnect();
-      unbind();
-    };
-  }, []);
+  // the angle arc from x to y the short way round
+  const ax = Math.atan2(x.y, x.x);
+  const delta = Math.atan2(Math.sin(Math.atan2(y.y, y.x) - ax), Math.cos(Math.atan2(y.y, y.x) - ax));
+  const rArc = Math.min(0.7, 0.45 * Math.min(nx, ny));
+  const ux: V = [x.x / nx, x.y / nx];
+  const uy: V = [y.x / ny, y.y / ny];
+  const ty: V = [t * y.x, t * y.y];
 
-  useEffect(() => {
-    drawRef.current = () => {
-      const plane = planeRef.current;
-      const graph = graphRef.current;
-      if (!plane || !graph) return;
-      const { v: vv, w: ww } = stateRef.current;
-      const { tStar, height, nv, nw } = measure(vv, ww);
-      let span = 3.2;
-      span = Math.max(span, Math.abs(vv[0]) / 0.7, Math.abs(vv[1]) / 0.7, Math.abs(ww[0]) / 0.7, Math.abs(ww[1]) / 0.7);
-      const view = mountPlane(plane, 0, 0, Math.min(span, 12));
-      viewRef.current = view;
-      if (view) {
-        axes(view);
-        if (nw > 1e-6) rule(view, 0, 0, ww[0], ww[1], GREEN, 1.1);
-        const proj: Pair = [tStar * ww[0], tStar * ww[1]];
-        arrow(view, 0, 0, proj[0], proj[1], GREEN, 1.7);
-        arrow(view, proj[0], proj[1], vv[0], vv[1], COPPER, 1.6);
-        arrow(view, 0, 0, ww[0], ww[1], GREEN, 2.2);
-        arrow(view, 0, 0, vv[0], vv[1], INK, 2.2);
-        arc(view, Math.atan2(ww[1], ww[0]), Math.atan2(vv[1], vv[0]), 26, INK);
-        dot(view, vv[0], vv[1], INK, 3.5);
-        dot(view, ww[0], ww[1], GREEN, 3.5);
-        text(view, vv[0], vv[1], "x");
-        text(view, ww[0], ww[1], "y", GREEN);
-      }
-      const half = 1.8;
-      const samples: Array<[number, number]> = [];
-      let peak = height;
-      for (let i = 0; i <= 80; i++) {
-        const t = tStar - half + (2 * half * i) / 80;
-        const value = nv * nv - 2 * t * (vv[0] * ww[0] + vv[1] * ww[1]) + t * t * nw * nw;
-        peak = Math.max(peak, value);
-        samples.push([t, value]);
-      }
-      const plot = mountGraph(graph, tStar - half, tStar + half, -peak * 0.08, peak * 1.12 + 0.4);
-      if (!plot) return;
-      axes(plot);
-      path(plot, samples, INK, 1.7);
-      segment(plot, tStar, 0, tStar, height, COPPER, 1.15, [3, 4]);
-      dot(plot, tStar, height, COPPER, 4);
-      text(plot, tStar, height, "t*");
-      plot.ctx.font = "12.5px 'IBM Plex Mono', ui-monospace, monospace";
-      plot.ctx.fillStyle = tone("#5e5a52");
-      plot.ctx.textAlign = "left";
-      plot.ctx.textBaseline = "top";
-      plot.ctx.fillText("t", plot.w - 36, plot.sy(0) + 6);
-    };
-    drawRef.current();
-  }, [v, w]);
+  // the parabola plot is centred at t* and scaled so that it fills the box
+  const tc = ny > 0 ? tStar : 0;
+  const top = Math.max(q(tc - W), q(tc + W), 1e-9);
+  const sy = 3 / top;
+  const ticks = Array.from({ length: 2 * W + 3 }, (_, i) => Math.ceil(tc - W) + i - 1).filter((n) => Math.abs(n - tc) <= W);
 
-  const { ip, nv, nw, cos, height } = measure(v, w);
-  const equal = height < 1e-3 && nv > 1e-3 && nw > 1e-3;
-  const formula = `|\\langle x,y\\rangle|=${fmt(Math.abs(ip))} \\le \\|x\\|\\,\\|y\\|=${fmt(nv * nw)}\\qquad \\|x\\|^2-\\frac{\\langle x,y\\rangle^2}{\\|y\\|^2}=${fmt(height)}\\qquad \\cos\\theta=${fmt(cos)}`;
+  const presets: [string, V, V][] = [
+    ["Acute", [1, 2], [2, 1]],
+    ["Right angle", [1, 2], [-2, 1]],
+    ["Obtuse", [1, 2], [-2, -0.5]],
+    ["Parallel", [1, 2], [-1, -2]],
+  ];
 
   return (
-    <figure className={styles.figure}>
+    <Stage
+      hint="drag x and y"
+      controls={
+        <>
+          {presets.map(([name, px, py]) => (
+            <Action
+              key={name}
+              onClick={() => {
+                x.setPoint(px);
+                y.setPoint(py);
+              }}
+            >
+              {name}
+            </Action>
+          ))}
+          <Slider tex="t" value={t} min={-3} max={3} step={0.05} onChange={tw.set} show={fmt(t, 2)} />
+          <Action primary onClick={() => tw.to(tStar)}>
+            Minimize over <Tex tex="t" />
+          </Action>
+        </>
+      }
+      readout={
+        <Readout
+          tex={
+            degenerate
+              ? `\\langle x,y\\rangle = ${fmt(ip)},\\qquad \\text{a zero vector has no angle}`
+              : `\\langle x,y\\rangle = ${fmt(ip)},\\quad \\|x\\|\\,\\|y\\| = ${fmt(nx, 3)}\\cdot${fmt(ny, 3)} = ${fmt(nx * ny)},\\quad \\cos\\theta = ${fmt(cos)},\\quad \\theta = ${fmt((Math.acos(Math.max(-1, Math.min(1, cos))) * 180) / Math.PI, 1)}^\\circ`
+          }
+          items={[
+            {
+              label: "Cauchy–Schwarz",
+              tex: `${fmt(ip * ip)} ${parallel ? "=" : "<"} ${fmt(nx * nx * ny * ny)}`,
+              tone: parallel ? "copper" : "teal",
+            },
+            { label: "angle", tex: kind },
+            { label: "‖x − ty‖² now", tex: fmt(q(t)), tone: "blue" },
+            {
+              label: "lowest value",
+              tex: ny > 0 ? `\\|x\\|^2 - \\tfrac{\\langle x,y\\rangle^2}{\\|y\\|^2} = ${fmt(min)}\\ \\text{at}\\ t^\\star = ${fmt(tStar)}` : `\\|x\\|^2 = ${fmt(min)}`,
+              tone: "copper",
+            },
+          ]}
+        />
+      }
+      caption={
+        <>
+          The sign of <Tex tex="\langle x,y\rangle" /> reads the angle: positive is acute, zero is right, negative is obtuse. On the right is{" "}
+          <Tex tex="q(t) = \|x - ty\|^2 = \|x\|^2 - 2t\langle x,y\rangle + t^2\|y\|^2" />, the squared length of the copper segment. It never goes
+          below zero, and for <Tex tex="y \ne 0" /> its lowest value, at <Tex tex="t^\star = \langle x,y\rangle/\|y\|^2" />, is{" "}
+          <Tex tex="\|x\|^2 - \langle x,y\rangle^2/\|y\|^2 \ge 0" />. Multiplied by <Tex tex="\|y\|^2" /> that is Cauchy–Schwarz, and the lowest
+          value is zero exactly when <Tex tex="x" /> is a multiple of <Tex tex="y" />. At <Tex tex="t^\star" /> the segment meets the line of{" "}
+          <Tex tex="y" /> at a right angle. For the notes&apos; <Tex tex="x = (1,2,2)^\mathsf{T}" /> and <Tex tex="y = (3,0,4)^\mathsf{T}" /> the lowest
+          value is <Tex tex="9 - 121/25 = 104/25" />, the same fact as <Tex tex="11 \le 15" />.
+        </>
+      }
+    >
       <div className={styles.views}>
-        <div>
-          <p className={styles.viewLabel}>
-            <Tex source="\langle x,y\rangle = \|x\|\|y\|\cos\theta" />
-          </p>
-          <canvas ref={planeRef} className={`${styles.canvas} ${styles.plane}`} aria-label="Two vectors and the angle between them. Drag either tip." />
+        <Plane x={[-3.5, 3.5]} y={[-3, 4.2]} height={380}>
+          {ny > 0 ? <Line.ThroughPoints point1={[0, 0]} point2={y.point} color={C.teal} weight={1} opacity={0.4} style="dashed" /> : null}
+          {!degenerate && ip === 0 ? (
+            <Polygon
+              points={[[0, 0], [0.3 * ux[0], 0.3 * ux[1]], [0.3 * (ux[0] + uy[0]), 0.3 * (ux[1] + uy[1])], [0.3 * uy[0], 0.3 * uy[1]]]}
+              color={C.ink}
+              fillOpacity={0}
+              weight={1.5}
+            />
+          ) : !degenerate ? (
+            <>
+              <Plot.Parametric xy={(s) => [rArc * Math.cos(ax + s * delta), rArc * Math.sin(ax + s * delta)]} domain={[0, 1]} color={C.ink} weight={1.5} />
+              <LaTeX at={[(rArc + 0.3) * Math.cos(ax + delta / 2), (rArc + 0.3) * Math.sin(ax + delta / 2)]} tex="\theta" color={C.ink} />
+            </>
+          ) : null}
+          {/* t·y and the segment x − t·y, whose squared length is the parabola */}
+          <Vector tip={ty} color={C.teal} weight={4} opacity={0.35} />
+          <Line.Segment point1={ty} point2={x.point} color={C.copper} weight={3} />
+          {ny > 0 ? <Point x={tStar * y.x} y={tStar * y.y} color={C.copper} opacity={0.7} svgCircleProps={{ r: 4 }} /> : null}
+          <Vector tip={y.point} color={C.teal} weight={3} />
+          <Vector tip={x.point} color={C.blue} weight={3} />
+          <LaTeX at={[x.x + 0.3, x.y + 0.35]} tex="x" color={C.blue} />
+          <LaTeX at={[y.x + 0.35, y.y - 0.3]} tex="y" color={C.teal} />
+          {y.element}
+          {x.element}
+        </Plane>
+        <div className={styles.side}>
+          <Plane x={[-W - 0.5, W + 0.5]} y={[-0.8, 3.7]} height={380} grid={false}>
+            <Line.Segment point1={[-W - 0.3, 0]} point2={[W + 0.3, 0]} color={C.muted} weight={1.5} />
+            {ticks.map((n) => (
+              <g key={n}>
+                <Line.Segment point1={[n - tc, -0.06]} point2={[n - tc, 0.06]} color={C.muted} weight={1.5} />
+                <LaTeX at={[n - tc, -0.3]} tex={String(n)} color={C.muted} />
+              </g>
+            ))}
+            <LaTeX at={[W + 0.3, 0.3]} tex="t" color={C.muted} />
+            <LaTeX at={[0, 3.45]} tex="\|x - t y\|^2" color={C.ink} />
+            <Plot.OfX y={(u) => sy * q(u + tc)} domain={[-W, W]} color={C.ink} weight={2.5} />
+            {/* the lowest point, never below the axis */}
+            <Line.Segment point1={[0, 0]} point2={[0, sy * min]} color={C.copper} weight={1} style="dashed" />
+            <Point x={0} y={sy * min} color={C.copper} />
+            <LaTeX at={[0.05, -0.6]} tex={ny > 0 ? "t^\\star" : ""} color={C.copper} />
+            {Math.abs(t - tc) <= W ? (
+              <>
+                <Line.Segment point1={[t - tc, 0]} point2={[t - tc, sy * q(t)]} color={C.blue} weight={1} opacity={0.5} />
+                <Point x={t - tc} y={sy * q(t)} color={C.blue} />
+              </>
+            ) : null}
+          </Plane>
         </div>
-        <div>
-          <p className={styles.viewLabel}>
-            <Tex source="t \mapsto \|x-ty\|^2" />
-          </p>
-          <canvas ref={graphRef} className={styles.canvas} aria-label="The squared distance from x to the line of y, as a parabola" />
-        </div>
       </div>
-      <div className={styles.inline}>
-        <button type="button" className={styles.text} onClick={() => { setV([1, 2]); setW([2, 1]); }}>
-          Acute
-        </button>
-        <button type="button" className={styles.text} onClick={() => { setV([1, 2]); setW([-2, 1]); }}>
-          Orthogonal
-        </button>
-        <button type="button" className={styles.text} onClick={() => { setV([1, 2]); setW([2, 4]); }}>
-          Parallel
-        </button>
-      </div>
-      <div className={styles.formula}>
-        <Tex source={formula} display />
-      </div>
-      <figcaption className={styles.caption}>
-        Drag either tip. The parabola is the squared length of <Tex source="x-ty" />, and its lowest point is the projection onto the line of <Tex source="y" />. That height is nonnegative, which is Cauchy–Schwarz, and it {equal ? "is zero because the vectors are parallel" : "stays above zero because the vectors are not parallel"}. The same completion of the square is the comparison <Tex source="11 \le 15" /> for the notes&apos; vectors <Tex source="(1,2,2)" /> and <Tex source="(3,0,4)" />.
-      </figcaption>
-    </figure>
+    </Stage>
   );
 }
+
