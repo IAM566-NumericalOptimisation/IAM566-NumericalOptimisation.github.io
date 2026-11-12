@@ -36,34 +36,8 @@
   color: var(--muted);
 }
 
-.meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 1.25rem 2.5rem;
-  margin: 2.2rem 0 0;
-  padding-top: 1.4rem;
-  border-top: 1px solid var(--line);
-}
-
-.meta dt {
-  font-family: var(--mono);
-  font-size: 0.66rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--faint);
-}
-
-.meta dd {
-  margin: 0.2rem 0 0;
-  font-size: 1.5rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-}
-
 .pdf {
-  margin-left: auto;
+  margin: 2rem 0 0;
 }
 
 .pdf a {
@@ -204,5 +178,4 @@
 
 @media (max-width: 1000px) {
   .hero { padding-top: 3rem; }
-  .pdf { margin-left: 0; }
 }

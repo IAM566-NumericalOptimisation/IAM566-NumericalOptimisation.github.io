@@ -1,5 +1,16 @@
 import type { ReactNode } from "react";
 import { AffineFigure } from "./AffineFigure";
+import { ChordGapFigure } from "./convex/ChordGapFigure";
+import { LocalGlobalFigure } from "./convex/LocalGlobalFigure";
+import { OptimalSetFigure } from "./convex/OptimalSetFigure";
+import { EpigraphFigure } from "./convex/EpigraphFigure";
+import { SublevelFigure } from "./convex/SublevelFigure";
+import { TangentFigure } from "./convex/TangentFigure";
+import { LowerBoundFigure } from "./convex/LowerBoundFigure";
+import { CurvatureFigure } from "./convex/CurvatureFigure";
+import { DomainMattersFigure } from "./convex/DomainMattersFigure";
+import { LeastSquaresRankFigure } from "./convex/LeastSquaresRankFigure";
+import { JensenFigure } from "./convex/JensenFigure";
 import { BasisFigure } from "./BasisFigure";
 import { CauchyFigure } from "./CauchyFigure";
 import { EigenFigure } from "./EigenFigure";
@@ -26,4 +37,16 @@ export const FIGURES: Record<string, { title: string; node: ReactNode }> = {
   Subspaces: { title: "The four subspaces", node: <SubspacesFigure /> },
   Transform: { title: "A matrix moves the plane", node: <TransformFigure /> },
   Eigen: { title: "Powers along the eigenlines", node: <EigenFigure /> },
+  // 6 Convex Functions
+  ChordGap: { title: "Graph height and chord height", node: <ChordGapFigure /> },
+  LocalGlobal: { title: "Local minimum, global minimum", node: <LocalGlobalFigure /> },
+  OptimalSet: { title: "The shape of the optimal set", node: <OptimalSetFigure /> },
+  Epigraph: { title: "Epigraph and hypograph", node: <EpigraphFigure /> },
+  Sublevel: { title: "Sublevel sets under a rising threshold", node: <SublevelFigure /> },
+  Tangent: { title: "Secant, tangent and the gradient inequality", node: <TangentFigure /> },
+  LowerBound: { title: "Tangent lower bounds and feasible directions", node: <LowerBoundFigure /> },
+  Curvature: { title: "Directional curvature of a quadratic", node: <CurvatureFigure /> },
+  DomainMatters: { title: "The same formula on two domains", node: <DomainMattersFigure /> },
+  LeastSquaresRank: { title: "Least squares, rank and the null direction", node: <LeastSquaresRankFigure /> },
+  Jensen: { title: "Finite Jensen and weighted variance", node: <JensenFigure /> },
 };

@@ -12,6 +12,7 @@
   --copper: #c2410c;
   --blue: #2563eb;
   --violet: #7c3aed;
+  --red: #b91c1c;
   --line: rgba(20, 22, 26, 0.1);
   --line-strong: rgba(20, 22, 26, 0.24);
   --shadow: 0 1px 2px rgba(20, 22, 26, 0.04), 0 12px 32px -18px rgba(20, 22, 26, 0.22);
@@ -32,6 +33,7 @@
   --copper: #fdba74;
   --blue: #93c5fd;
   --violet: #c4b5fd;
+  --red: #fca5a5;
   --line: rgba(231, 233, 238, 0.1);
   --line-strong: rgba(231, 233, 238, 0.24);
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 40px -20px rgba(0, 0, 0, 0.8);
@@ -222,3 +224,75 @@ button, input { font: inherit; color: inherit; }
 }
 
 .MafsView .mafs-shadow { stroke: var(--surface); }
+
+/* subsections, tables, solutions and remarks inside the reading text */
+
+.prose h3 {
+  margin: 2.4rem 0 0.6rem;
+  font-family: var(--sans);
+  font-size: 1.22rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
+}
+
+.prose table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-family: var(--sans);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.prose th,
+.prose td {
+  padding: 0.5rem 0.9rem 0.5rem 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.prose th {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+  border-bottom-color: var(--line-strong);
+}
+
+.prose details.solution {
+  margin: 0.4rem 0 1.4rem;
+  padding: 0.2rem 0 0.2rem 1rem;
+  border-left: 2px solid var(--line-strong);
+}
+
+.prose details.solution > summary {
+  cursor: pointer;
+  width: fit-content;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.prose details.solution[open] > summary { margin-bottom: 0.4rem; }
+
+.prose p.remark {
+  padding-left: 1rem;
+  border-left: 2px solid var(--violet);
+  color: var(--muted);
+}
+
+.prose p.remark > strong:first-child { color: var(--violet); }
+
+@media print {
+  .prose details.solution > summary { display: none; }
+  .prose details.solution::details-content { content-visibility: visible; display: block; }
+  .prose details.solution > * { display: block; }
+  .reading-bar, nav[aria-label="Chapters"] { display: none; }
+}

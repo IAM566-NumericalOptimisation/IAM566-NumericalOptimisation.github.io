@@ -67,7 +67,7 @@ A figure is a line on its own:
 [[LpBall]]
 ```
 
-The names that exist now are `SupInf`, `Affine`, `Span`, `Basis`, `Metric`, `LpBall`, `Cauchy`, `Projection`, `GramSchmidt`, `Subspaces`, `Transform`, and `Eigen`. They are registered, with their titles, in `components/figures/registry.tsx`. A new figure needs an entry there as well as the marker in the note. On a wide screen each figure sits beside its section and stays in view while the section is read.
+The names that exist now are `SupInf`, `Affine`, `Span`, `Basis`, `Metric`, `LpBall`, `Cauchy`, `Projection`, `GramSchmidt`, `Subspaces`, `Transform`, and `Eigen` for chapter 0.1, and `ChordGap`, `LocalGlobal`, `OptimalSet`, `Epigraph`, `Sublevel`, `Tangent`, `LowerBound`, `Curvature`, `DomainMatters`, `LeastSquaresRank`, and `Jensen` for chapter 6 (in `components/figures/convex/`, with their mathematics in `lib/convex/models.ts`, checked by `npm run test:math`). They are registered, with their titles, in `components/figures/registry.tsx`. A new figure needs an entry there as well as the marker in the note. On a wide screen each figure sits beside its section and stays in view while the section is read.
 
 `linear-algebra.md` is the pattern to follow. The other files are still `status: forthcoming`.
 
@@ -93,3 +93,4 @@ Read the chapter at `http://localhost:3000/notes/<slug>/`. Check the contents, t
 | 3 | `content/notes/level-curves.md` | `3 - Level Curves and Descent.pdf` |
 | 4 | `content/notes/convex-sets.md` | `4 - Convex Sets.pdf` |
 | 5 | `content/notes/separation.md` | `5 - Separation and Farkas.pdf` |
+| 6 | `content/notes/convex-functions.md` | `6 - Convex Functions.pdf` |

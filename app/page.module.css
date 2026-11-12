@@ -1,71 +1,49 @@
-.hero {
-  max-width: 48rem;
-  padding: 6rem 0 2.5rem;
-}
+/* The homepage reads like the opening of a set of notes: a title, one sentence,
+   the descent animation, then the contents. Type is the reading serif. */
 
-.kicker {
-  margin: 0;
-  font-family: var(--mono);
-  font-size: 0.75rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--faint);
+.page {
+  max-width: 44rem;
+  padding-top: 5rem;
 }
 
 .title {
-  margin: 1.1rem 0 0;
-  font-size: clamp(3rem, 8vw, 5.6rem);
-  font-weight: 600;
-  letter-spacing: -0.055em;
-  line-height: 0.95;
+  margin: 0;
+  font-family: var(--serif);
+  font-size: clamp(2.4rem, 5.5vw, 3.4rem);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
 }
 
 .lede {
-  margin: 1.4rem 0 0;
+  margin: 1rem 0 0;
+  max-width: 34rem;
   font-family: var(--serif);
-  font-size: 1.3rem;
+  font-size: 1.2rem;
+  line-height: 1.6;
   color: var(--muted);
 }
 
-.cta {
-  margin: 2rem 0 0;
+.lede a {
+  color: inherit;
+  text-decoration-color: var(--line-strong);
 }
 
-.cta a {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 500;
-  color: var(--ink);
-  text-decoration: none;
-  border-bottom: 1px solid var(--line-strong);
-  padding-bottom: 0.2rem;
-  transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
-}
-
-.cta a:hover {
+.lede a:hover {
   color: var(--accent);
-  border-color: var(--accent);
-}
-
-.cta a span {
-  transition: transform 0.2s var(--ease);
-}
-
-.cta a:hover span {
-  transform: translateX(4px);
+  text-decoration-color: currentColor;
 }
 
 /* the animation: a wide band that fades out at its edges */
 
 .band {
-  margin: 1rem 0 0;
+  margin: 2.5rem 0 0;
 }
 
 .field {
   display: block;
   width: 100%;
-  height: clamp(260px, 38vw, 440px);
+  height: clamp(240px, 34vw, 380px);
   -webkit-mask-image: radial-gradient(ellipse 70% 75% at 50% 50%, #000 45%, transparent 100%);
   mask-image: radial-gradient(ellipse 70% 75% at 50% 50%, #000 45%, transparent 100%);
 }
@@ -73,72 +51,84 @@
 .band figcaption {
   margin-top: 0.4rem;
   text-align: center;
-  font-size: 0.82rem;
+  font-family: var(--serif);
+  font-size: 0.95rem;
+  font-style: italic;
   color: var(--faint);
 }
 
-/* chapters */
+/* contents */
 
-.chapters {
-  max-width: 48rem;
-  padding-top: 4rem;
-}
-
-.chaptersHead {
-  margin: 0 0 0.75rem;
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  font-weight: 400;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--faint);
+.head {
+  margin: 3.5rem 0 0.5rem;
+  font-family: var(--serif);
+  font-size: 1.35rem;
+  font-weight: 500;
 }
 
 .list {
   list-style: none;
   margin: 0;
   padding: 0;
+  border-top: 1px solid var(--line);
+}
+
+.list li {
+  padding: 2px 0;
+  border-bottom: 1px solid var(--line);
 }
 
 .row {
   display: grid;
-  grid-template-columns: 3.5rem minmax(0, 1fr) auto;
-  gap: 1rem;
+  grid-template-columns: 2.75rem minmax(0, 1fr) auto;
   align-items: baseline;
-  padding: 0.95rem 0;
-  border-top: 1px solid var(--line);
+  gap: 0.75rem;
+  padding: 0.75rem 0.5rem;
+  border-radius: 4px;
   color: var(--faint);
   text-decoration: none;
 }
 
 .code {
-  font-family: var(--mono);
-  font-size: 0.85rem;
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .name {
-  font-size: 1.3rem;
-  font-weight: 500;
-  letter-spacing: -0.02em;
-  transition: color 0.2s var(--ease), transform 0.25s var(--ease);
+  font-family: var(--serif);
+  font-size: 1.25rem;
 }
 
-.status {
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+.soon {
+  font-family: var(--serif);
+  font-size: 0.95rem;
+  font-style: italic;
 }
 
 .live {
   color: var(--ink);
+  transition: background-color 0.15s ease;
 }
 
-.live .status {
+.live .code {
   color: var(--accent);
 }
 
-.row:hover .name {
-  color: var(--accent);
-  transform: translateX(4px);
+.live:hover,
+.live:focus-visible {
+  background: var(--surface-2);
+}
+
+.live:hover .name,
+.live:focus-visible .name {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+@media (max-width: 600px) {
+  .page { padding-top: 3rem; }
+  .row { grid-template-columns: 2.25rem minmax(0, 1fr); }
+  .soon { grid-column: 2; font-size: 0.85rem; }
 }

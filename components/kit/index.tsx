@@ -22,6 +22,7 @@ export const C = {
   copper: "var(--copper)",
   blue: "var(--blue)",
   violet: "var(--violet)",
+  red: "var(--red)",
 } as const;
 
 export function Tex({ tex, display = false, className }: { tex: string; display?: boolean; className?: string }) {
@@ -61,16 +62,19 @@ export function Plane({
   height = 420,
   children,
   grid = true,
+  stretch = false,
 }: {
   x: [number, number];
   y: [number, number];
   height?: number;
   children: ReactNode;
   grid?: boolean;
+  /** fill the box exactly, with unequal x and y scales (for graphs of functions) */
+  stretch?: boolean;
 }) {
   return (
     <div className={styles.plane}>
-      <Mafs height={height} viewBox={{ x, y, padding: 0 }} preserveAspectRatio="contain" pan={false} zoom={false}>
+      <Mafs height={height} viewBox={{ x, y, padding: 0 }} preserveAspectRatio={stretch ? false : "contain"} pan={false} zoom={false}>
         {grid ? <Coordinates.Cartesian subdivisions={2} xAxis={{ lines: 1, labels: (n) => (n % 2 === 0 && n !== 0 ? n : "") }} yAxis={{ lines: 1, labels: (n) => (n % 2 === 0 && n !== 0 ? n : "") }} /> : null}
         {children}
       </Mafs>
@@ -232,4 +236,28 @@ export function useTween(initial: number, duration = 900) {
   );
   useEffect(() => () => cancelAnimationFrame(raf.current), []);
   return { value, to, set };
+}
+
+/**
+ * Previous / Next through a figure's numbered steps, with the current step named.
+ * Steps accumulate: step k shows everything introduced in steps 0..k.
+ */
+export function Stepper({ steps, step, onStep }: { steps: string[]; step: number; onStep: (k: number) => void }) {
+  const last = steps.length - 1;
+  return (
+    <div className={styles.stepper}>
+      <button type="button" className={styles.action} onClick={() => onStep(Math.max(0, step - 1))} disabled={step <= 0} aria-label="Previous step">
+        ← Previous
+      </button>
+      <button type="button" className={`${styles.action} ${styles.primary}`} onClick={() => onStep(Math.min(last, step + 1))} disabled={step >= last} aria-label="Next step">
+        Next →
+      </button>
+      <span className={styles.stepLabel} aria-live="polite">
+        <span className={styles.stepNum}>
+          {step + 1}/{steps.length}
+        </span>{" "}
+        {steps[step]}
+      </span>
+    </div>
+  );
 }

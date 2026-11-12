@@ -48,8 +48,6 @@ export default async function NotePage({ params }: Props) {
   }
 
   const { intro, sections } = sectionsOf(note.content);
-  const figureCount = sections.reduce((n, s) => n + s.figures.filter((f) => FIGURES[f]).length, 0);
-  const words = note.content.split(/\s+/).length;
   let fig = 0;
 
   return (
@@ -63,27 +61,13 @@ export default async function NotePage({ params }: Props) {
             <Markdown source={intro} />
           </div>
         ) : null}
-        <dl className={styles.meta}>
-          <div>
-            <dt>Sections</dt>
-            <dd>{sections.length}</dd>
-          </div>
-          <div>
-            <dt>Interactive figures</dt>
-            <dd>{figureCount}</dd>
-          </div>
-          <div>
-            <dt>Reading</dt>
-            <dd>~{Math.round(words / 180)} min</dd>
-          </div>
-          {note.pdf ? (
-            <div className={styles.pdf}>
-              <a href={note.pdf} target="_blank" rel="noreferrer">
-                Full notes (PDF) <span aria-hidden="true">↗</span>
-              </a>
-            </div>
-          ) : null}
-        </dl>
+        {note.pdf ? (
+          <p className={styles.pdf}>
+            <a href={note.pdf} target="_blank" rel="noreferrer">
+              Full notes (PDF) <span aria-hidden="true">↗</span>
+            </a>
+          </p>
+        ) : null}
       </header>
 
       <div className={styles.layout}>
